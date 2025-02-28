@@ -1,0 +1,401 @@
+//Developer console codes
+HomePage:
+          public class Homepage {
+    
+    public List<Patient__c> patlists { get; set; }
+    public List<Doctor__c> doclists { get; set; }
+    public List<Appointment__c> applists { get; set; }
+    public List<Bed_Reservation__c> BedReserlists { get; set; }
+
+    public String searchCriteria { get; set; }
+    public String selectedRecordId { get; set; }
+
+    public Homepage() {
+        fetchRecords();
+    }
+
+    // ✅ Fetches all records when the page loads
+    private void fetchRecords() {
+        patlists = [SELECT ID, Name, Mobile__c FROM Patient__c ORDER BY CreatedDate DESC LIMIT 10];
+        doclists = [SELECT ID, Name, Mobile__c FROM Doctor__c ORDER BY CreatedDate DESC LIMIT 10];
+        applists = [SELECT ID, Name, Appointment_Date__c, Patient_Name__r.Name, Doctor_Name__r.Name 
+                    FROM Appointment__c ORDER BY Appointment_Date__c DESC LIMIT 10];
+        BedReserlists = [SELECT ID, Patient__r.Name, Bed_Number__c, Reservation_Date__c, Start_Time__c, End_Time__c 
+                         FROM Bed_Reservation__c ORDER BY Reservation_Date__c DESC LIMIT 10];
+    }
+
+    // ✅ Search function
+    public void performSearch() {
+        if (String.isBlank(searchCriteria)) {
+            fetchRecords();
+            return;
+        }
+
+        String searchKey = '%' + searchCriteria + '%';
+
+        patlists = [SELECT ID, Name, Mobile__c FROM Patient__c 
+                    WHERE Name LIKE :searchKey OR Mobile__c LIKE :searchKey];
+
+        doclists = [SELECT ID, Name, Mobile__c FROM Doctor__c 
+                    WHERE Name LIKE :searchKey OR Mobile__c LIKE :searchKey];
+
+        Date searchDate;
+        try {
+            searchDate = Date.valueOf(searchCriteria);
+        } catch (Exception e) {
+            searchDate = null;
+        }
+
+        if (searchDate != null) {
+            applists = [SELECT ID, Name, Appointment_Date__c, Patient_Name__r.Name, Doctor_Name__r.Name 
+                        FROM Appointment__c WHERE Appointment_Date__c = :searchDate 
+                        ORDER BY Appointment_Date__c DESC];
+        } else {
+            applists = [SELECT ID, Name, Appointment_Date__c, Patient_Name__r.Name, Doctor_Name__r.Name 
+                        FROM Appointment__c WHERE Name LIKE :searchKey 
+                        ORDER BY Appointment_Date__c DESC];
+        }
+    }
+
+    // ✅ Delete functions
+    public void deletePatient() {
+        if (selectedRecordId != null) {
+            delete [SELECT Id FROM Patient__c WHERE Id = :selectedRecordId];
+            fetchRecords(); // Refresh the list after deletion
+        }
+    }
+
+    public void deleteDoctor() {
+        if (selectedRecordId != null) {
+            delete [SELECT Id FROM Doctor__c WHERE Id = :selectedRecordId];
+            fetchRecords();
+        }
+    }
+
+    public void deleteAppointment() {
+        if (selectedRecordId != null) {
+            delete [SELECT Id FROM Appointment__c WHERE Id = :selectedRecordId];
+            fetchRecords();
+        }
+    }
+
+    public void deleteBedReservation() {
+        if (selectedRecordId != null) {
+            delete [SELECT Id FROM Bed_Reservation__c WHERE Id = :selectedRecordId];
+            fetchRecords();
+        }
+    }
+}
+
+____________________________________________________________________________________________________________________________________________________________________________________________________________________-
+
+Home valuforcepage:
+
+                <apex:page controller="Homepage">
+    <apex:form >
+        <apex:pageBlock title="HealthMate - Home Page">
+            
+            <!-- Search Section -->
+            <apex:pageBlockSection title="Search Patients & Doctors">
+                <apex:inputText value="{!searchCriteria}" />
+                <apex:commandButton value="Search" action="{!performSearch}" reRender="results"/>
+                <apex:commandButton value="Go to Salesforce Home" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/page/home" immediate="true"/>
+            </apex:pageBlockSection>
+
+        </apex:pageBlock>
+
+        <!-- Results Section -->
+        <apex:pageBlock id="results">
+
+            <!-- Patients Table -->
+            <apex:pageBlockSection title="Patients">
+                <apex:commandButton value="New Patient" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/o/Patient__c/new" immediate="true"/>
+                <apex:pageBlockTable value="{!patlists}" var="p">
+                    <apex:column value="{!p.Name}" headerValue="Name"/>
+                    <apex:column value="{!p.Mobile__c}" headerValue="Mobile"/>
+                </apex:pageBlockTable>
+            </apex:pageBlockSection>
+
+            <!-- Doctors Table -->
+            <apex:pageBlockSection title="Doctors">
+                <apex:commandButton value="New Doctor" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/o/Doctor__c/new" immediate="true"/>
+                <apex:pageBlockTable value="{!doclists}" var="d">
+                    <apex:column value="{!d.Name}" headerValue="Name"/>
+                    <apex:column value="{!d.Mobile__c}" headerValue="Mobile"/>
+                </apex:pageBlockTable>
+            </apex:pageBlockSection>
+
+            <!-- Appointments Table -->
+            <apex:pageBlockSection title="Appointments">
+                <apex:commandButton value="New Appointment" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/o/Appointment__c/new" immediate="true"/>
+                <apex:pageBlockTable value="{!applists}" var="a">
+                    <apex:column value="{!a.Name}" headerValue="Name"/>
+                    <apex:column value="{!a.Appointment_Date__c}" headerValue="Date"/>
+                    <apex:column value="{!a.Patient_Name__r.Name}" headerValue="Patient"/>
+                    <apex:column value="{!a.Doctor_Name__r.Name}" headerValue="Doctor"/>
+                </apex:pageBlockTable>
+            </apex:pageBlockSection>
+
+        </apex:pageBlock>
+    </apex:form>
+</apex:page>
+
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________-
+
+// patient appex classs:
+                    public class PatientController {
+    public String searchKey { get; set; }
+    public List<Patient__c> patientList { get; set; }
+    public Id selectedRecordId { get; set; }
+    
+    public PatientController() {
+        searchKey = '';
+        patientList = [SELECT Id, Name, Mobile__c, Gender__c FROM Patient__c LIMIT 10];
+    }
+
+    // ✅ Search Patients
+    public void searchPatients() {
+        patientList = [SELECT Id, Name, Mobile__c, Gender__c 
+                       FROM Patient__c 
+                       WHERE Name LIKE :('%' + searchKey + '%') 
+                       OR Mobile__c LIKE :('%' + searchKey + '%') 
+                       LIMIT 10];
+    }
+
+    // ✅ Delete Patient
+    public void deletePatient() {
+        if (selectedRecordId != null) {
+            delete [SELECT Id FROM Patient__c WHERE Id = :selectedRecordId LIMIT 1];
+            // Refresh list after deletion
+            searchPatients();
+        }
+    }
+}
+__________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+patient valueforcepage:
+
+                    <apex:page controller="PatientController">
+    <apex:form >
+        <apex:pageBlock title="Patient Search">
+            
+            <!-- ✅ Search Box -->
+            <apex:inputText value="{!searchKey}" />
+            <apex:commandButton value="Search" action="{!searchPatients}" rerender="patientList"/>
+            
+            <!-- ✅ New Patient Button -->
+            <apex:commandButton value="New Patient" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/o/Patient__c/new" />
+            
+            <!-- ✅ Cancel Button (Redirects to Home Page) -->
+            <apex:commandButton value="Cancel" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/page/home" immediate="true"/>
+            
+            <!-- ✅ Patient Table -->
+            <apex:pageBlockTable value="{!patientList}" var="p" id="patientList">
+                <apex:column value="{!p.Name}" headerValue="Name"/>
+                <apex:column value="{!p.Mobile__c}" headerValue="Mobile"/>
+                <apex:column value="{!p.Gender__c}" headerValue="Gender"/>
+                
+                <!-- ✅ Delete Button -->
+                <apex:column headerValue="Actions">
+                    <apex:commandButton value="Delete" action="{!deletePatient}" rerender="patientList">
+                        <apex:param name="selectedRecordId" value="{!p.Id}" assignTo="{!selectedRecordId}"/>
+                    </apex:commandButton>
+                </apex:column>
+            </apex:pageBlockTable>
+
+        </apex:pageBlock>
+    </apex:form>
+</apex:page>
+
+________________________________________________________________________________________________________________________________________________________________________________________________
+Doctorcontroller apex class:
+             public class DoctorController {
+    // Declare the Doctor object
+    public Doctor__c d { get; set; }
+
+    // Constructor initializes a new Doctor record
+    public DoctorController() {
+        d = new Doctor__c();
+    }
+
+    // Save method to insert a new Doctor record
+    public PageReference save() {
+        try {
+            insert d;
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.CONFIRM, 'Doctor record saved successfully!'));
+            return new PageReference('/' + d.Id);
+        } catch (Exception e) {
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, e.getMessage()));
+            return null;
+        }
+    }
+
+    // Save & New method to reset form after saving
+    public PageReference saveandnew() {
+        save();  // Call save method
+        d = new Doctor__c(); // Reset the object for a new entry
+        return null; // Stay on the same page
+    }
+
+    // Cancel method to return to Home Page
+    public PageReference cancel() {
+        return new PageReference('/lightning/n/Home_Page');
+    }
+}
+
+______________________________________________________________________________________________________________________________________________________________________________________________________
+//doctor page valueforcepage:
+                       <apex:page sidebar="false" showHeader="false" controller="DoctorController">
+    <apex:form >
+        <apex:pageBlock title="NEW DOCTOR DETAILS">
+            
+            <apex:pageMessages />
+
+            <apex:pageBlockSection columns="2">
+                <apex:inputField value="{!d.Doctor_ID__c}"/>
+                <apex:inputField value="{!d.Gender__c}"/>
+                <apex:inputField value="{!d.Name}" required="true"/>
+                <apex:inputField value="{!d.DOB__c}"/> 
+                <apex:inputField value="{!d.Email__c}"/>
+                <apex:inputField value="{!d.Age__c}"/>
+                <apex:inputField value="{!d.Mobile__c}"/>
+                <apex:inputField value="{!d.Specialization__c}"/>
+            </apex:pageBlockSection>
+
+            <apex:pageBlockButtons >
+                <apex:commandButton value="Save" action="{!save}" />
+                <apex:commandButton value="Save & New" action="{!saveandnew}" />
+                <!-- ✅ Updated Cancel Button to Redirect to Home Page -->
+                <apex:commandButton value="Cancel" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/n/Home_Page" immediate="true"/>
+            </apex:pageBlockButtons>
+
+        </apex:pageBlock>
+    </apex:form>
+</apex:page>
+
+___________________________________________________________________________________________________________________________________________________________________________________________________________-
+Appointment appex class:
+            public class AppointmentController {
+    // Declare the Appointment object
+    public Appointment__c a { get; set; }
+
+    // Constructor initializes a new Appointment record
+    public AppointmentController() {
+        a = new Appointment__c();
+    }
+
+    // Save method to insert a new Appointment record
+    public PageReference save() {
+        try {
+            insert a;
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.CONFIRM, 'Appointment saved successfully!'));
+            return new PageReference('/' + a.Id);
+        } catch (Exception e) {
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, e.getMessage()));
+            return null;
+        }
+    }
+
+    // Save & New method to reset form after saving
+    public PageReference saveandnew() {
+        save();  // Call save method
+        a = new Appointment__c(); // Reset the object for a new entry
+        return null; // Stay on the same page
+    }
+
+    // Cancel method to navigate to Home Page
+    public PageReference cancel() {
+        return new PageReference('/lightning/n/Home_Page');
+    }
+}
+_______________________________________________________________________________________________________________________________________________________________________________________________________________________
+Appointment valueforcepage:
+               <apex:page sidebar="false" showHeader="false" controller="AppointmentController">
+    <apex:form >
+        <apex:pageBlock title="Appointment DETAILS">
+            <apex:pageMessages />
+
+            <apex:pageBlockSection columns="2">
+                <apex:inputField value="{!a.Name}" required="true"/>
+                <apex:inputField value="{!a.Appointment_Date__c}" required="true"/>
+                <apex:inputField value="{!a.Doctor_Name__c}" required="true"/>
+                <apex:inputField value="{!a.Patient_Name__c}" required="true"/>
+                <apex:inputField value="{!a.Start_Time__c}" required="true"/>
+                <apex:inputField value="{!a.End_Time__c}" required="true"/>
+            </apex:pageBlockSection>
+
+            <apex:pageBlockButtons >
+                <apex:commandButton value="Save" action="{!save}" />
+                <apex:commandButton value="Save & New" action="{!saveandnew}" />
+                <!-- ✅ Updated Cancel Button to Redirect to Home Page -->
+                <apex:commandButton value="Cancel" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/n/Home_Page" immediate="true"/>
+            </apex:pageBlockButtons>
+        </apex:pageBlock>
+    </apex:form>
+</apex:page>
+__________________________________________________________________________________________________________________________________________________________________________________________________________________
+ BedReservatoion appex class:
+               public class BedReservationController {
+    // Declare the Bed Reservation object
+    public Bed_Reservation__c r { get; set; }
+
+    // Constructor initializes a new Bed Reservation record
+    public BedReservationController() {
+        r = new Bed_Reservation__c();
+    }
+
+    // Method to insert a new Bed Reservation record
+    public PageReference reserveBed() {
+        try {
+            insert r;
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.CONFIRM, 'Bed reserved successfully!'));
+            return new PageReference('/' + r.Id);
+        } catch (Exception e) {
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, e.getMessage()));
+            return null;
+        }
+    }
+
+    // Reserve & New method to reset form after reserving
+    public PageReference reserveandnew() {
+        reserveBed();  // Call reserve method
+        r = new Bed_Reservation__c(); // Reset the object for a new entry
+        return null; // Stay on the same page
+    }
+
+    // Cancel method to navigate to Home Page
+    public PageReference cancel() {
+        return new PageReference('/lightning/n/Home_Page');
+    }
+}
+________________________________________________________________________________________________________________________________________________________________________________________________________________________
+ BeedReservation valueforcepage:
+                     <apex:page controller="BedReservationController">
+    <apex:form >
+        <apex:pageBlock >
+            <apex:pageBlockSection title="Bed Reservation">
+                <apex:inputField value="{!r.Bed_Type__c}" required="true"/>
+                <apex:inputField value="{!r.Bed_Number__c}" required="true"/>
+                <apex:inputField value="{!r.Reservation_Date__c}" required="true"/>
+                <apex:inputField value="{!r.Start_Time__c}" required="true"/>
+                <apex:inputField value="{!r.End_Time__c}" required="true"/>
+                <apex:inputField value="{!r.Patient__c}" required="true"/>
+            </apex:pageBlockSection>
+
+            <apex:pageBlockButtons >
+                <apex:commandButton action="{!reserveBed}" value="Reserve Bed"/>
+                <apex:commandButton value="Reserve & New" action="{!reserveandnew}" />
+                <!-- ✅ Updated Cancel Button to Redirect to Home Page -->
+                <apex:commandButton value="Cancel" action="https://kits-2e0-dev-ed.develop.lightning.force.com/lightning/n/Home_Page" immediate="true"/>
+            </apex:pageBlockButtons>
+        </apex:pageBlock>
+
+        <apex:pageMessages />
+    </apex:form>
+</apex:page>
+
+
+
+
+
+       
